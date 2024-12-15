@@ -1,0 +1,105 @@
+
+-- Created Products Table
+CREATE TABLE products (
+    product_id INT PRIMARY KEY,
+    product_name VARCHAR(100),
+    category VARCHAR(50)
+);
+
+-- Created Sales Table
+CREATE TABLE sales (
+    order_id INT PRIMARY KEY,
+    customer_id INT,
+    order_date DATE,
+    product_id INT,
+    quantity INT,
+    price DECIMAL(10,2),
+    FOREIGN KEY (product_id) REFERENCES products(product_id)
+);
+
+-- product data
+INSERT INTO products (product_id, product_name, category) VALUES
+(1, 'Laptop', 'Electronics'),
+(2, 'Smartphone', 'Electronics'),
+(3, 'Headphones', 'Electronics'),
+(4, 'Running Shoes', 'Sports'),
+(5, 'Tennis Racket', 'Sports'),
+(6, 'Coffee Maker', 'Appliances'),
+(7, 'Blender', 'Appliances'),
+(8, 'Desk Chair', 'Furniture'),
+(9, 'Bookshelf', 'Furniture'),
+(10, 'Wireless Mouse', 'Electronics');
+
+-- sales data
+INSERT INTO sales (order_id, customer_id, order_date, product_id, quantity, price) VALUES
+(101, 1001, '2023-01-01', 1, 2, 999.99),
+(102, 1002, '2023-02-12', 2, 1, 599.99),
+(103, 1003, '2023-03-30', 3, 3, 79.99),
+(104, 1001, '2023-06-04', 4, 1, 129.99),
+(105, 1004, '2023-09-14', 5, 3, 199.99),
+(106, 1002, '2023-11-16', 6, 9, 149.99),
+(107, 1005, '2023-12-17', 7, 8, 89.99),
+(108, 1003, '2024-01-05', 8, 5, 249.99),
+(109, 1004, '2024-03-20', 9, 3, 179.99),
+(110, 1005, '2024-05-24', 10, 6, 49.99),
+(111, 1001, '2024-06-01', 2, 5, 599.99),
+(112, 1002, '2024-06-12', 1, 10, 999.99);
+
+
+select * from sales;
+select * from products;
+
+-- q1: find the top 5 customers based on the total amount spent.
+with spent_per_user as (
+select customer_id, sum(quantity)*sum(price) as total_spent_per_user
+from sales
+group by 1),
+spent_ranking as (
+select *,
+dense_rank() over(order by total_spent_per_user desc ) as highest_purchase_ranking
+from spent_per_user
+)
+select * from spent_ranking where highest_purchase_ranking <= 5;
+
+-- q2: find the product with the highest and lowest sales (quantity sold) for each category.
+with cte1 as
+(select product_id, sum(quantity) as quantity_sold_per_product
+from sales
+group by 1),
+cte2 as
+(select a.*, b.* from cte1 a
+left join products b on a.product_id = b.product_id
+),
+cte3 as
+(select cte2.*,
+rank() over(partition by category order by quantity_sold_per_product desc ) highestqnt_sales_rnk,
+rank() over(partition by category order by quantity_sold_per_product  ) lowestqnt_sales_rnk
+from cte2
+)
+select product_name, category,quantity_sold_per_product from cte3 
+where highestqnt_sales_rnk = 1;
+-- where lowestqnt_sales_rnk = 1;
+
+-- Q3: rank products within each category based on the total revenue generated.
+with spent_per_product as (
+select product_id, sum(quantity)*sum(price) as revenue_per_product
+from sales
+group by 1),
+cte2 as (
+select a.*, category, product_name from spent_per_product a
+left join products b on a.product_id = b.product_id
+),
+cte3 as
+(select *, 
+rank() over(partition by category order by revenue_per_product desc) as revenue_ranking
+from cte2
+)
+select * from cte3;
+
+-- Q4: to find the monthly revenue generated for the year 2023, grouped by month.
+select  extract(month from order_date) as month,
+sum(quantity)*sum(price) as total_revenue
+from sales
+where extract(year from order_date) = 2023
+group by 1;
+
